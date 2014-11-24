@@ -39,10 +39,10 @@ int cogen_fun_def_trailer(FILE *fp, char *name){
 int cogen_fun_def_prologue(FILE *fp, char *name, int index, int frame_sz){
     //fprintf(fp, "%s:\n.LFB%d:\n\t.cfi_startproc\n\tpushl\t%%ebp\n\t.cfi_def_cfa_offset 8\n\t.cfi_offset 5, -8\n\tmovl\t%%esp, %%ebp\n\t.cfi_def_cfa_register 5\n\tpushl\t%%ebx\n\tsubl\t$%d, %%esp\n\t.cfi_offset\t3, -12\n", name, index, frame_sz * 4);
     if(frame_sz == 0){
-        fprintf(fp, "%s:\n.LFB%d:\n\t.cfi_startproc\n\tpushl\t%%ebp\n\t.cfi_def_cfa_offset 8\n\t.cfi_offset 5, -8\n\tmovl\t%%esp, %%ebp\n\t.cfi_def_cfa_register 5\n", name, index);
+        fprintf(fp, "%s:\n.LFB%d:\n\t.cfi_startproc\n\tpushl\t%%ebp\n\t.cfi_def_cfa_offset 8\n\t.cfi_offset 5, -8\n\tmovl\t%%esp, %%ebp\n\t.cfi_def_cfa_register 5\n\tpushl\t%%ebx\n", name, index);
     }
     else{
-        fprintf(fp, "%s:\n.LFB%d:\n\t.cfi_startproc\n\tpushl\t%%ebp\n\t.cfi_def_cfa_offset 8\n\t.cfi_offset 5, -8\n\tmovl\t%%esp, %%ebp\n\t.cfi_def_cfa_register 5\n\tsubl\t$%d, %%esp\n", name, index, frame_sz * 4);
+        fprintf(fp, "%s:\n.LFB%d:\n\t.cfi_startproc\n\tpushl\t%%ebp\n\t.cfi_def_cfa_offset 8\n\t.cfi_offset 5, -8\n\tmovl\t%%esp, %%ebp\n\t.cfi_def_cfa_register 5\n\tpushl\t%%ebx\n\tsubl\t$%d, %%esp\n", name, index, frame_sz * 4);
     }
 
     return 0;
@@ -53,7 +53,10 @@ int cogen_fun_def_epilogue(FILE *fp, char *name, int index, int frame_sz, enviro
     if(env->return_label != NULL){
         fprintf(fp, "%s:\n", env->return_label);
     }
-    fprintf(fp, "\tleave\n");
+    fprintf(fp, "\taddl\t$%d, %%esp\n", env->esp_sz * 4);
+    pr_single_op(fp, "popl", "%ebx");
+    pr_single_op(fp, "popl", "%ebp");
+    //fprintf(fp, "\tleave\n");
     fprintf(fp, "\t.cfi_restore 5\n\t.cfi_def_cfa 4, 4\n\tret\n\t.cfi_endproc\n.LFE%d:\n", index);
     return 0;
 }
@@ -65,6 +68,7 @@ int cogen_alloc_storage_fun_def(fun_def_t fd){
 int cogen_fun_def(FILE *fp, fun_def_t fd, char *filename, int index, int *p_label_sz){
     int frame_sz = cogen_alloc_storage_fun_def(fd);
     environment_t env = mk_environment(*p_label_sz);
+    env->esp_sz += frame_sz;
     set_environment_params(env, fd->params);
     cogen_fun_def_header(fp, fd->f);
     cogen_fun_def_prologue(fp, fd->f, index, frame_sz);
@@ -127,6 +131,7 @@ int cogen_stmt_kind_compound(FILE *fp, stmt_t s, environment_t env){
     int sz = ((list_t)s->u.c.decls)->n;
     if(sz != 0){
         fprintf(fp, "\tsubl\t$%d, %%esp\n", sz * 4);
+        env->esp_sz += sz;
     }
     int i;
     for(i = 0; i < ((list_t)(s->u.c.body))->n; i++){

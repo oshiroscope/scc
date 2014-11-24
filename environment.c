@@ -23,6 +23,7 @@ environment_t mk_environment(int label_sz){
     env->continue_labels = (char **)malloc(sizeof(char *)*10);
     env->continue_label_sz = 0;
     env->return_label = NULL;
+    env->esp_sz = 0;
     return env;
 }
 

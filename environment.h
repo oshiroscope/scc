@@ -21,6 +21,7 @@ struct environment{
     char **continue_labels;
     int continue_label_sz;
     char *return_label;
+    int esp_sz;
 };
 
 environment_t mk_environment(int label_sz);
