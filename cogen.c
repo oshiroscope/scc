@@ -317,21 +317,16 @@ char *cogen_expr_kind_app(FILE *fp, expr_t e, environment_t env){
                     char *reg = try_to_lock(env);
                     pr_double_op(fp, "movl", str, reg);
                     pr_double_op(fp, "movl", reg, "(%esp)");
-                    /*fprintf(fp, "\tmovl\t%s, %s\n", str, reg);
-                    fprintf(fp, "\tmovl\t%s, (%%esp)\n", reg);*/
                     try_to_free(env, reg);
                 }
                 else{
                     pr_double_op(fp, "movl", str, "(%esp)");
-                    //fprintf(fp, "\tmovl\t%s, (%%esp)\n", str);
                 }
-
             }
             else{
                 if(isdigit(str[0]) || str[0] == '-'){
                     char *reg = try_to_lock(env);
                     pr_double_op(fp, "movl", str, reg);
-                    //fprintf(fp, "\tmovl\t%s, %s\n", str, reg);
                     fprintf(fp, "\tmovl\t%s, %d(%%esp)\n", reg, 4 * i);
                     try_to_free(env, reg);
                 }
@@ -342,11 +337,16 @@ char *cogen_expr_kind_app(FILE *fp, expr_t e, environment_t env){
             try_to_free(env, str);
         }
         pr_single_op(fp, "call", func);
-        //fprintf(fp, "\tcall\t%s\n", func);
-        char *ret_reg = try_to_lock(env);
-        pr_double_op(fp, "movl", "%eax", ret_reg);
-        //fprintf(fp, "\tmovl\t%%eax, %s\n", ret_reg);
-        return ret_reg;
+        if(env->reg_flags[reg_to_index("%ebx")]){
+            char *ret_reg = try_to_lock(env);
+            pr_double_op(fp, "movl", "%eax", ret_reg);
+            return ret_reg;
+        }
+        else{
+            lock_reg(env, "%ebx");
+            pr_double_op(fp, "movl", "%eax", "%ebx");
+            return "%ebx";
+        }
     }
 
     /* a = b */
