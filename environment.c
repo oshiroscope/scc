@@ -92,7 +92,7 @@ char *index_to_reg(int id){
     case 1:
         return "%ecx";
     case 2:
-        return "%edx";
+        return "%esi";
     default:
         error();
     }
@@ -101,7 +101,7 @@ char *index_to_reg(int id){
 int reg_to_index(char *reg){
     if(strcmp(reg, "%ebx") == 0) return 0;
     else if(strcmp(reg, "%ecx") == 0) return 1;
-    else if(strcmp(reg, "%edx") == 0) return 2;
+    else if(strcmp(reg, "%esi") == 0) return 2;
     else error();
 }
 
@@ -129,7 +129,7 @@ void free_all_reg(environment_t env){
 }
 
 int is_reg(char *str){
-    return strcmp(str, "%ebx") == 0 || strcmp(str, "%ecx") == 0 || strcmp(str, "%edx") == 0;
+    return strcmp(str, "%ebx") == 0 || strcmp(str, "%ecx") == 0 || strcmp(str, "%esi") == 0;
 }
 
 char *try_to_lock(environment_t env){

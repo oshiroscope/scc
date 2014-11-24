@@ -301,6 +301,133 @@ char *cogen_expr_kind_paren(FILE *fp, expr_t e, environment_t env){
     return cogen_expr(fp, e->u.p, env);
 }
 
+char *cogen_expr_additive_recursive(FILE *fp, expr_t e, environment_t env, char *reg, int op){
+    expr_t e0 = expr_list_get(e->u.a.args, 0);
+    expr_t e1 = expr_list_get(e->u.a.args, 1);
+    char *r0 = cogen_expr(fp, e0, env);
+    if(op == -1){
+        pr_double_op(fp, "movl", r0, reg);
+    }
+    else if(op == 0){
+        pr_double_op(fp, "addl", r0, reg);
+    }
+    else if(op == 1){
+        pr_double_op(fp, "subl", r0, reg);
+    }
+    try_to_free(env, r0);
+    if(e1->kind == expr_kind_app && (e1->u.a.o == op_kind_bin_plus || e1->u.a.o == op_kind_bin_minus)){
+        if(e->u.a.o == op_kind_bin_plus){
+            return cogen_expr_additive_recursive(fp, e1, env, reg, 0);
+        }
+        else if(e->u.a.o == op_kind_bin_minus){
+            return cogen_expr_additive_recursive(fp, e1, env, reg, 1);
+        }
+    }
+    char *r1 = cogen_expr(fp, e1, env);
+    if(e->u.a.o == op_kind_bin_plus){
+        pr_double_op(fp, "addl", r1, reg);
+    }
+    else if(e->u.a.o == op_kind_bin_minus){
+        pr_double_op(fp, "subl", r1, reg);
+    }
+    try_to_free(env, r1);
+    return reg;
+}
+
+char *cogen_expr_multiplicative_recursive(FILE *fp, expr_t e, environment_t env, char *reg, int op){
+    expr_t e0 = expr_list_get(e->u.a.args, 0);
+    expr_t e1 = expr_list_get(e->u.a.args, 1);
+    char *r0 = cogen_expr(fp, e0, env);
+    if(op == -1){
+        pr_double_op(fp, "movl", r0, reg);
+    }
+    else if(op == 0){
+        pr_double_op(fp, "imull", r0, reg);
+    }
+    else if(op == 1){
+        pr_double_op(fp, "movl", reg, "%eax");
+        if(r0[0] == '$'){
+            char *reg_tmp = try_to_lock(env);
+            pr_double_op(fp, "movl", r0, reg_tmp);
+            fprintf(fp, "\tcltd\n");
+            pr_single_op(fp, "idivl", reg_tmp);
+            pr_double_op(fp, "movl", "%eax", reg);
+            try_to_free(env, reg_tmp);
+        }
+        else{
+            fprintf(fp, "\tcltd\n");
+            pr_single_op(fp, "idivl", r0);
+            pr_double_op(fp, "movl", "%eax", reg);
+        }
+    }
+    else if(op == 2){
+        pr_double_op(fp, "movl", reg, "%eax");
+        if(r0[0] == '$'){
+            char *reg_tmp = try_to_lock(env);
+            pr_double_op(fp, "movl", r0, reg_tmp);
+            fprintf(fp, "\tcltd\n");
+            pr_single_op(fp, "idivl", reg_tmp);
+            pr_double_op(fp, "movl", "%edx", reg);
+            try_to_free(env, reg_tmp);
+        }
+        else{
+            fprintf(fp, "\tcltd\n");
+            pr_single_op(fp, "idivl", r0);
+            pr_double_op(fp, "movl", "%edx", reg);
+        }
+    }
+    try_to_free(env, r0);
+    if(e1->kind == expr_kind_app && (e1->u.a.o == op_kind_mult || e1->u.a.o == op_kind_div || e1->u.a.o == op_kind_rem)){
+        if(e->u.a.o == op_kind_mult){
+            return cogen_expr_multiplicative_recursive(fp, e1, env, reg, 0);
+        }
+        else if(e->u.a.o == op_kind_div){
+            return cogen_expr_multiplicative_recursive(fp, e1, env, reg, 1);
+        }
+        else if(e->u.a.o == op_kind_rem){
+            return cogen_expr_multiplicative_recursive(fp, e1, env, reg, 2);
+        }
+    }
+    char *r1 = cogen_expr(fp, e1, env);
+    if(e->u.a.o == op_kind_mult){
+        pr_double_op(fp, "imull", r1, reg);
+    }
+    else if(e->u.a.o == op_kind_div){
+        pr_double_op(fp, "movl", reg, "%eax");
+        if(r1[0] == '$'){
+            char *reg_tmp = try_to_lock(env);
+            pr_double_op(fp, "movl", r1, reg_tmp);
+            fprintf(fp, "\tcltd\n");
+            pr_single_op(fp, "idivl", reg_tmp);
+            pr_double_op(fp, "movl", "%eax", reg);
+            try_to_free(env, reg_tmp);
+        }
+        else{
+            fprintf(fp, "\tcltd\n");
+            pr_single_op(fp, "idivl", r1);
+            pr_double_op(fp, "movl", "%eax", reg);
+        }
+    }
+    else if(e->u.a.o == op_kind_rem){
+        pr_double_op(fp, "movl", reg, "%eax");
+        if(r1[0] == '$'){
+            char *reg_tmp = try_to_lock(env);
+            pr_double_op(fp, "movl", r1, reg_tmp);
+            fprintf(fp, "\tcltd\n");
+            pr_single_op(fp, "idivl", reg_tmp);
+            pr_double_op(fp, "movl", "%edx", reg);
+            try_to_free(env, reg_tmp);
+        }
+        else{
+            fprintf(fp, "\tcltd\n");
+            pr_single_op(fp, "idivl", r1);
+            pr_double_op(fp, "movl", "%edx", reg);
+        }
+    }
+    try_to_free(env, r1);
+    return reg;
+}
+
 char *cogen_expr_kind_app(FILE *fp, expr_t e, environment_t env){
     expr_t e0, e1;
 
@@ -413,8 +540,14 @@ char *cogen_expr_kind_app(FILE *fp, expr_t e, environment_t env){
 
     /* a + b */
     case op_kind_bin_plus:{
-        e0 = expr_list_get(e->u.a.args, 0);
+        char *reg = cogen_expr_additive_recursive(fp, e, env, try_to_lock(env),-1);
+        return reg;
+        /*e0 = expr_list_get(e->u.a.args, 0);
         e1 = expr_list_get(e->u.a.args, 1);
+        if(e1->u.a.o == op_kind_bin_plus || e1->u.a.o == op_kind_bin_minus){
+            char *r0 = cogen_expr(fp, e0, env);
+            expr_t e1_0 = expr_list_get()
+        }
         char *left = cogen_expr(fp, e0, env);
         char *right = cogen_expr(fp, e1, env);
         if(is_reg(right)){
@@ -431,11 +564,13 @@ char *cogen_expr_kind_app(FILE *fp, expr_t e, environment_t env){
             pr_double_op(fp, "movl", right, reg);
             pr_double_op(fp, "addl", left, reg);
             return reg;
-        }
+        }*/
     }
     /* a - b */
     case op_kind_bin_minus:{
-        e0 = expr_list_get(e->u.a.args, 0);
+        char *reg = cogen_expr_additive_recursive(fp, e, env, try_to_lock(env), -1);
+        return reg;
+        /*e0 = expr_list_get(e->u.a.args, 0);
         e1 = expr_list_get(e->u.a.args, 1);
         char *left = cogen_expr(fp, e0, env);
         char *right = cogen_expr(fp, e1, env);
@@ -448,11 +583,13 @@ char *cogen_expr_kind_app(FILE *fp, expr_t e, environment_t env){
             pr_double_op(fp, "movl", left, reg);
             pr_double_op(fp, "subl", right, reg);
             return reg;
-        }
+        }*/
     }
     /* a * b */
     case op_kind_mult:{
-        e0 = expr_list_get(e->u.a.args, 0);
+        char *reg = cogen_expr_multiplicative_recursive(fp, e, env, try_to_lock(env), -1);
+        return reg;
+        /*e0 = expr_list_get(e->u.a.args, 0);
         e1 = expr_list_get(e->u.a.args, 1);
         char *left = cogen_expr(fp, e0, env);
         char *right = cogen_expr(fp, e1, env);
@@ -470,11 +607,13 @@ char *cogen_expr_kind_app(FILE *fp, expr_t e, environment_t env){
             pr_double_op(fp, "movl", right, reg);
             pr_double_op(fp, "imull", left, reg);
             return reg;
-        }
+        }*/
     }
     /* a / b */
     case op_kind_div:{
-        e0 = expr_list_get(e->u.a.args, 0);
+        char *reg = cogen_expr_multiplicative_recursive(fp, e, env, try_to_lock(env), -1);
+        return reg;
+        /*e0 = expr_list_get(e->u.a.args, 0);
         e1 = expr_list_get(e->u.a.args, 1);
         char *numer = cogen_expr(fp, e0, env);
         char *denom = cogen_expr(fp, e1, env);
@@ -500,12 +639,14 @@ char *cogen_expr_kind_app(FILE *fp, expr_t e, environment_t env){
             pr_single_op(fp, "idivl", denom);
             try_to_free(env, denom);
         }
-        return "%eax";
+        return "%eax";*/
     }
 
     /* a % b */
     case op_kind_rem:{
-        e0 = expr_list_get(e->u.a.args, 0);
+        char *reg = cogen_expr_multiplicative_recursive(fp, e, env, try_to_lock(env), -1);
+        return reg;
+        /*e0 = expr_list_get(e->u.a.args, 0);
         e1 = expr_list_get(e->u.a.args, 1);
         char *numer = cogen_expr(fp, e0, env);
         char *denom = cogen_expr(fp, e1, env);
@@ -532,7 +673,7 @@ char *cogen_expr_kind_app(FILE *fp, expr_t e, environment_t env){
             try_to_free(env, denom);
         }
         lock_reg(env, "%edx");
-        return "%edx";
+        return "%edx";*/
     }
     /* +a 単項+ */
     case op_kind_un_plus:{
