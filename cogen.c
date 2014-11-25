@@ -37,7 +37,6 @@ int cogen_fun_def_trailer(FILE *fp, char *name){
 }
 
 int cogen_fun_def_prologue(FILE *fp, char *name, int index, int frame_sz){
-    //fprintf(fp, "%s:\n.LFB%d:\n\t.cfi_startproc\n\tpushl\t%%ebp\n\t.cfi_def_cfa_offset 8\n\t.cfi_offset 5, -8\n\tmovl\t%%esp, %%ebp\n\t.cfi_def_cfa_register 5\n\tpushl\t%%ebx\n\tsubl\t$%d, %%esp\n\t.cfi_offset\t3, -12\n", name, index, frame_sz * 4);
     if(frame_sz == 0){
         fprintf(fp, "%s:\n.LFB%d:\n\t.cfi_startproc\n\tpushl\t%%ebp\n\t.cfi_def_cfa_offset 8\n\t.cfi_offset 5, -8\n\tmovl\t%%esp, %%ebp\n\t.cfi_def_cfa_register 5\n\tpushl\t%%ebx\n", name, index);
     }
@@ -49,14 +48,12 @@ int cogen_fun_def_prologue(FILE *fp, char *name, int index, int frame_sz){
 }
 
 int cogen_fun_def_epilogue(FILE *fp, char *name, int index, int frame_sz, environment_t env){
-    //fprintf(fp, "\taddl\t$%d, %%esp\n\tpopl\t%%ebx\n\t.cfi_restore\t3\n\tpopl\t%%ebp\n\t.cfi_restore 5\n\t.cfi_def_cfa 4, 4\n\tret\n\t.cfi_endproc\n.LFE%d:\n", frame_sz * 4, index);
     if(env->return_label != NULL){
         fprintf(fp, "%s:\n", env->return_label);
     }
     fprintf(fp, "\taddl\t$%d, %%esp\n", env->esp_sz * 4);
     pr_single_op(fp, "popl", "%ebx");
     pr_single_op(fp, "popl", "%ebp");
-    //fprintf(fp, "\tleave\n");
     fprintf(fp, "\t.cfi_restore 5\n\t.cfi_def_cfa 4, 4\n\tret\n\t.cfi_endproc\n.LFE%d:\n", index);
     return 0;
 }
@@ -198,16 +195,12 @@ int cogen_stmt_kind_if(FILE *fp, stmt_t s, environment_t env){
         if(is_relational(s->u.i.e->u.a.o)){
             //比較文に応じたjmp命令
             pr_single_op(fp, op_kind_to_jmp_str_for_if(s->u.i.e->u.a.o), then_label);
-            //fprintf(fp, "\t%s\t%s\n", op_kind_to_jmp_str_for_if(s->u.i.e->u.a.o), then_label);
         }
         else{
             char *reg = try_to_lock(env);
             pr_double_op(fp, "movl", ex, reg);
             pr_double_op(fp, "testl", reg, reg);
             pr_single_op(fp, "jne", then_label);
-            /*fprintf(fp, "\tmovl\t%s, %s\n", ex, reg);
-            fprintf(fp, "\ttestl\t%s, %s\n", reg, reg);
-            fprintf(fp, "\tjne\t%s\n", then_label);*/
             try_to_free(env, reg);
         }
         cogen_stmt(fp, s->u.i.th, env);
@@ -216,16 +209,12 @@ int cogen_stmt_kind_if(FILE *fp, stmt_t s, environment_t env){
             char *else_label = get_label(env);
             pr_single_op(fp, "jmp", else_label);
             pr_label(fp, then_label);
-            /*fprintf(fp, "\tjmp\t%s\n", else_label);
-            fprintf(fp, "%s:\n", then_label);*/
             cogen_stmt(fp, s->u.i.el, env);
             pr_label(fp, else_label);
-            //fprintf(fp, "%s:\n", else_label);
         }
         //else文がない場合
         else{
             pr_label(fp, then_label);
-            //fprintf(fp, "%s:\n", then_label);
         }
     }
 }
@@ -236,18 +225,14 @@ int cogen_stmt_kind_while(FILE *fp, stmt_t s, environment_t env){
     push_continue_label(env, first_label);
     pr_single_op(fp, "jmp", first_label);
     pr_label(fp, second_label);
-    /*fprintf(fp, "\tjmp\t%s\n", first_label);
-    fprintf(fp, "%s:\n", second_label);*/
     cogen_stmt(fp, s->u.w.body, env);
     pr_label(fp, first_label);
-    //fprintf(fp, "%s:\n", first_label);
     char *ex = cogen_expr(fp, s->u.w.e, env);
     if(s->u.w.e->kind == expr_kind_int_literal){
         if(atoi(s->u.w.e->u.s) == 0){
             //何もしない
         }else{
             pr_single_op(fp, "jmp", second_label);
-            //fprintf(fp, "\tjmp\t%s\n", second_label);
         }
     }else{
         if(is_relational(s->u.i.e->u.a.o)){
@@ -259,15 +244,11 @@ int cogen_stmt_kind_while(FILE *fp, stmt_t s, environment_t env){
             pr_double_op(fp, "movl", ex, reg);
             pr_double_op(fp, "testl", reg, reg);
             pr_single_op(fp, "jne", second_label);
-            /*fprintf(fp, "\tmovl\t%s, %s\n", ex, reg);
-            fprintf(fp, "\ttestl\t%s, %s\n", reg, reg);
-            fprintf(fp, "\tjne\t%s\n", second_label);*/
             try_to_free(env, reg);
         }
     }
     if(is_break_label_set(env)){
         pr_label(fp, env->break_label);
-        //fprintf(fp, "%s:\n", env->break_label);
         free_break_label(env);
     }
     pop_continue_label(env);
@@ -487,12 +468,9 @@ char *cogen_expr_kind_app(FILE *fp, expr_t e, environment_t env){
             char *reg = try_to_lock(env);
             pr_double_op(fp, "movl", right, reg);
             pr_double_op(fp, "movl", reg, left);
-            /*fprintf(fp, "\tmovl\t%s, %s\n", right, reg);
-            fprintf(fp, "\tmovl\t%s, %s\n", reg, left);*/
             try_to_free(env, reg);
         }else{
             pr_double_op(fp, "movl", right, left);
-            //fprintf(fp, "\tmovl\t%s, %s\n", right, left);
         }
         try_to_free(env, right);
         return left;
@@ -518,20 +496,15 @@ char *cogen_expr_kind_app(FILE *fp, expr_t e, environment_t env){
             char *reg = try_to_lock(env);
             pr_double_op(fp, "movl", left, reg);
             pr_double_op(fp, "cmpl", right, reg);
-            /*fprintf(fp, "\tmovl\t%s, %s\n", left, reg);
-            fprintf(fp, "\tcmpl\t%s, %s\n", right, reg);*/
             try_to_free(env, reg);
         }
         else if(left[0] == '$'){
             char *reg = try_to_lock(env);
             pr_double_op(fp, "movl", left, reg);
             pr_double_op(fp, "cmpl", right, reg);
-            /*fprintf(fp, "\tmovl\t%s, %s\n", left, reg);
-            fprintf(fp, "\tcmpl\t%s, %s\n", right, reg);*/
         }
         else{
             pr_double_op(fp, "cmpl", right, left);
-            //fprintf(fp, "\tcmpl\t%s, %s\n", right, left);
         }
         try_to_free(env, right);
         try_to_free(env, left);
@@ -542,138 +515,27 @@ char *cogen_expr_kind_app(FILE *fp, expr_t e, environment_t env){
     case op_kind_bin_plus:{
         char *reg = cogen_expr_additive_recursive(fp, e, env, try_to_lock(env),-1);
         return reg;
-        /*e0 = expr_list_get(e->u.a.args, 0);
-        e1 = expr_list_get(e->u.a.args, 1);
-        if(e1->u.a.o == op_kind_bin_plus || e1->u.a.o == op_kind_bin_minus){
-            char *r0 = cogen_expr(fp, e0, env);
-            expr_t e1_0 = expr_list_get()
-        }
-        char *left = cogen_expr(fp, e0, env);
-        char *right = cogen_expr(fp, e1, env);
-        if(is_reg(right)){
-            pr_double_op(fp, "addl", left, right);
-            try_to_free(env, left);
-            return right;
-        }
-        else if(is_reg(left)){
-            pr_double_op(fp, "addl", right, left);
-            return left;
-        }
-        else{
-            char *reg = try_to_lock(env);
-            pr_double_op(fp, "movl", right, reg);
-            pr_double_op(fp, "addl", left, reg);
-            return reg;
-        }*/
     }
     /* a - b */
     case op_kind_bin_minus:{
         char *reg = cogen_expr_additive_recursive(fp, e, env, try_to_lock(env), -1);
         return reg;
-        /*e0 = expr_list_get(e->u.a.args, 0);
-        e1 = expr_list_get(e->u.a.args, 1);
-        char *left = cogen_expr(fp, e0, env);
-        char *right = cogen_expr(fp, e1, env);
-        if(is_reg(left)){
-            pr_double_op(fp, "subl", right, left);
-            return left;
-        }
-        else{
-            char *reg = try_to_lock(env);
-            pr_double_op(fp, "movl", left, reg);
-            pr_double_op(fp, "subl", right, reg);
-            return reg;
-        }*/
     }
     /* a * b */
     case op_kind_mult:{
         char *reg = cogen_expr_multiplicative_recursive(fp, e, env, try_to_lock(env), -1);
         return reg;
-        /*e0 = expr_list_get(e->u.a.args, 0);
-        e1 = expr_list_get(e->u.a.args, 1);
-        char *left = cogen_expr(fp, e0, env);
-        char *right = cogen_expr(fp, e1, env);
-        if(is_reg(right)){
-            pr_double_op(fp, "imull", left, right);
-            try_to_free(env, left);
-            return right;
-        }
-        else if(is_reg(left)){
-            pr_double_op(fp, "imull", right, left);
-            return left;
-        }
-        else{
-            char *reg = try_to_lock(env);
-            pr_double_op(fp, "movl", right, reg);
-            pr_double_op(fp, "imull", left, reg);
-            return reg;
-        }*/
     }
     /* a / b */
     case op_kind_div:{
         char *reg = cogen_expr_multiplicative_recursive(fp, e, env, try_to_lock(env), -1);
         return reg;
-        /*e0 = expr_list_get(e->u.a.args, 0);
-        e1 = expr_list_get(e->u.a.args, 1);
-        char *numer = cogen_expr(fp, e0, env);
-        char *denom = cogen_expr(fp, e1, env);
-        if(strcmp(numer, "%%eax") != 0){
-            if(strcmp(denom, "%eax") == 0){
-                char *reg = try_to_lock(env);
-                pr_double_op(fp, "movl", denom, reg);
-                pr_double_op(fp, "movl", numer, "%eax");
-                try_to_free(env, numer);
-                fprintf(fp, "\tcltd\n");
-                pr_single_op(fp, "idivl", reg);
-                free_reg(env, reg);
-            }
-            else{
-                pr_double_op(fp, "movl", numer, "%eax");
-                try_to_free(env, numer);
-                fprintf(fp, "\tcltd\n");
-                pr_single_op(fp, "idivl", denom);
-                try_to_free(env, denom);
-            }
-        }else{
-            fprintf(fp, "\tcltd\n");
-            pr_single_op(fp, "idivl", denom);
-            try_to_free(env, denom);
-        }
-        return "%eax";*/
     }
 
     /* a % b */
     case op_kind_rem:{
         char *reg = cogen_expr_multiplicative_recursive(fp, e, env, try_to_lock(env), -1);
         return reg;
-        /*e0 = expr_list_get(e->u.a.args, 0);
-        e1 = expr_list_get(e->u.a.args, 1);
-        char *numer = cogen_expr(fp, e0, env);
-        char *denom = cogen_expr(fp, e1, env);
-        if(strcmp(numer, "%%eax") != 0){
-            if(strcmp(denom, "%eax") == 0){
-                char *reg = try_to_lock(env);
-                pr_double_op(fp, "movl", denom, reg);
-                pr_double_op(fp, "movl", numer, "%eax");
-                try_to_free(env, numer);
-                fprintf(fp, "\tcltd\n");
-                pr_single_op(fp, "idivl", reg);
-                free_reg(env, reg);
-            }
-            else{
-                pr_double_op(fp, "movl", numer, "%eax");
-                try_to_free(env, numer);
-                fprintf(fp, "\tcltd\n");
-                pr_single_op(fp, "idivl", denom);
-                try_to_free(env, denom);
-            }
-        }else{
-            fprintf(fp, "\tcltd\n");
-            pr_single_op(fp, "idivl", denom);
-            try_to_free(env, denom);
-        }
-        lock_reg(env, "%edx");
-        return "%edx";*/
     }
     /* +a 単項+ */
     case op_kind_un_plus:{
