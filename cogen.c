@@ -2,40 +2,70 @@
 #include "cogen.h"
 #include "print.h"
 
-
+/*
+ * プログラムファイル単位のヘッダ
+ * 意味自体は理解していない
+ */
 int cogen_program_header(FILE *fp, char *filename){
     fprintf(fp, "\t.file\t\"%s\"\n\t.text\n", filename);
 }
 
+/*
+ * プログラムファイル単位のトレーラー
+ * 意味自体は理解していない
+ */
 int cogen_program_trailer(FILE *fp, char *filename){
-    fprintf(fp, "\t.ident\t\"GCC: (Ubuntu 4.8.2-19ubuntu1) 4.8.2\"\n\t.section\t.note.GNU-stack,\"\",@progbits\n");
+    fprintf(fp, "\t.ident\t\"GCC: (Ubuntu 4.8.2-19ubuntu1) 4.8.2\"\n");
+    fprintf(fp, "\t.section\t.note.GNU-stack,\"\",@progbits\n");
 }
 
+/*
+ * プログラム全体のコード生成の呼び出し元
+ * 関数定義ごとにcogen_fun_defを呼び出す
+ */
 int cogen_program(FILE *fp, program_t p, char *filename){
+    //プログラム全体のヘッダ
     cogen_program_header(fp, filename);
+    //関数定義のリストとサイズを取得
     fun_def_list_t fd_list = p->fun_defs;
-    int n = fun_def_list_sz(fd_list);
-    int i;
+    int fd_sz = fun_def_list_sz(fd_list);
+    //レーベルの数を保存するポインタを用意する
     int *p_label_sz = (int *)malloc(sizeof(int));
     *p_label_sz = 0;
-    for(i = 0; i < n; i++){
+    //関数リストの要素ごとにcogen_fun_defを呼び出す
+    int i;
+    for(i = 0; i < fd_sz; i++){
+        //関数リストの要素を取得
         fun_def_t fd = fun_def_list_get(fd_list, i);
         cogen_fun_def(fp, fd, filename, i, p_label_sz);
     }
+    //プログラム全体のトレーラー
     cogen_program_trailer(fp, filename);
     return 0;
 }
 
+/*
+ * 関数定義ごとのヘッダ
+ * 関数の名前を書けば良いっぽい(よくわからん)
+ */
 int cogen_fun_def_header(FILE *fp, char *name){
     fprintf(fp, "\t.globl\t%s\n\t.type\t%s, @function\n", name, name);
     return 0;
 }
 
+/*
+ * 関数定義ごとのトレーラー
+ * 関数の名前を書けば良いっぽい(よくわからん)
+ */
 int cogen_fun_def_trailer(FILE *fp, char *name){
     fprintf(fp, "\t.size\t%s, .-%s\n", name, name);
     return 0;
 }
 
+/*
+ * 関数定義ごとのプロローグ
+ * fram_sz : 引数の数(本当はいらない？)
+ */
 int cogen_fun_def_prologue(FILE *fp, char *name, int index, int frame_sz){
     if(frame_sz == 0){
         fprintf(fp, "%s:\n.LFB%d:\n\t.cfi_startproc\n\tpushl\t%%ebp\n\t.cfi_def_cfa_offset 8\n\t.cfi_offset 5, -8\n\tmovl\t%%esp, %%ebp\n\t.cfi_def_cfa_register 5\n\tpushl\t%%ebx\n", name, index);
@@ -43,10 +73,12 @@ int cogen_fun_def_prologue(FILE *fp, char *name, int index, int frame_sz){
     else{
         fprintf(fp, "%s:\n.LFB%d:\n\t.cfi_startproc\n\tpushl\t%%ebp\n\t.cfi_def_cfa_offset 8\n\t.cfi_offset 5, -8\n\tmovl\t%%esp, %%ebp\n\t.cfi_def_cfa_register 5\n\tpushl\t%%ebx\n\tsubl\t$%d, %%esp\n", name, index, frame_sz * 4);
     }
-
     return 0;
 }
 
+/*
+ * 関数定義ごとのエピローグ
+ */
 int cogen_fun_def_epilogue(FILE *fp, char *name, int index, int frame_sz, environment_t env){
     if(env->return_label != NULL){
         fprintf(fp, "%s:\n", env->return_label);
@@ -255,7 +287,6 @@ int cogen_stmt_kind_while(FILE *fp, stmt_t s, environment_t env){
 }
 
 char *cogen_expr(FILE *fp, expr_t e, environment_t env){
-
     switch(e->kind){
     case expr_kind_int_literal:
         return cogen_expr_kind_int_literal(fp, e, env);
