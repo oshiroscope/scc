@@ -316,6 +316,25 @@ char *cogen_expr_kind_paren(FILE *fp, expr_t e, environment_t env){
 char *cogen_expr_additive_recursive(FILE *fp, expr_t e, environment_t env, char *reg, int op){
     expr_t e0 = expr_list_get(e->u.a.args, 0);
     expr_t e1 = expr_list_get(e->u.a.args, 1);
+    if(e1->kind == expr_kind_app && e1->u.a.o == op_kind_fun && !(e0->kind == expr_kind_app && e0->u.a.o == op_kind_fun)){
+        char *r1 = cogen_expr(fp, e1, env);
+        char *r0 = cogen_expr(fp, e0, env);
+        if(op == -1){
+            pr_double_op(fp, "movl", r0, reg);
+        }else if(op == 0){
+            pr_double_op(fp, "addl", r0, reg);
+        }else if(op == 1){
+            pr_double_op(fp, "subl", r0, reg);
+        }
+        if(e->u.a.o == op_kind_bin_plus){
+            pr_double_op(fp, "addl", r1, reg);
+        }else if(e->u.a.o == op_kind_bin_minus){
+            pr_double_op(fp, "subl", r1, reg);
+        }
+        try_to_free(env, r0);
+        try_to_free(env, r1);
+        return reg;
+    }
     char *r0 = cogen_expr(fp, e0, env);
     if(op == -1){
         pr_double_op(fp, "movl", r0, reg);
@@ -486,6 +505,7 @@ char *cogen_expr_kind_app(FILE *fp, expr_t e, environment_t env){
             pr_double_op(fp, "movl", "%eax", "%ebx");
             return "%ebx";
         }
+
     }
 
     /* a = b */
